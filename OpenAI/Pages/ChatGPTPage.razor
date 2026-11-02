@@ -1,0 +1,81 @@
+﻿@page "/chatgpt"
+@using System.Text
+@using System.Text.Json
+@using OpenAI.Models
+@inject HttpClient Http
+
+<h3>ChatGPT API Integration</h3>
+
+
+<div class="mb-3">
+	<label for="userInput">Enter your Question</label>
+	<input id="userInput" class="form-control" @bind="userPrompt" />
+	<button @onclick="SubmitPrompt" class="btn btn-primary mt-3">@buttonText</button>
+</div>
+
+@if (responseText != null)
+{
+	<div class="alert alert-info" role="alert">
+		<h5>Response:</h5>
+		<p>@((MarkupString)responseText)</p>
+	</div>
+}
+
+
+@code {
+	private string userPrompt = "";
+	private string? responseText;
+	private string? buttonText = "Send to ChatGPT";
+
+	private readonly string apiKey = "sk-proj-xxxl";
+
+	private async Task SubmitPrompt()
+	{
+		buttonText = "Sending ... ";
+
+		//Sending a Request to the ChatGPT API endpoint for chat completions
+		var url = "https://api.openai.com/v1/chat/completions";		
+
+		var requestData = new
+		{
+			model = "gpt-4o-mini",
+			messages = new[]
+			{
+				new{role="system",content="Your are a helpful assistant" + "format every response in HTML"},
+				new{role="user",content=userPrompt}
+			},
+			temperature = 0.7
+		};		
+
+		var requestMessage = new HttpRequestMessage(HttpMethod.Post, url);
+		requestMessage.Headers.Add("Authorization", $"Bearer {apiKey}");
+		requestMessage.Content = new StringContent(JsonSerializer.Serialize(requestData), Encoding.UTF8, "application/json");
+
+		try
+		{
+			//Send the request to the OpenAI API
+			var response = await Http.SendAsync(requestMessage);
+
+			if (response.IsSuccessStatusCode)
+			{
+				var responseContent = await response.Content.ReadAsStringAsync();
+				var completion = JsonSerializer.Deserialize<ChatResponse>(responseContent);
+				responseText = completion.choices[0].message.content;
+			}
+			else
+			{
+				responseText = " Error: " + response.StatusCode;
+			}
+		}
+		catch (Exception ex)
+		{
+			responseText = "An error occured: " + ex.Message;
+		}
+		finally
+		{
+			buttonText = "Sent";
+		}
+		
+
+	}
+}
